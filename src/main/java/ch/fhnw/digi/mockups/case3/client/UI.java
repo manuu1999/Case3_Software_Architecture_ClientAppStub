@@ -6,16 +6,10 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
 import javax.annotation.PostConstruct;
-import javax.swing.BoxLayout;
-import javax.swing.DefaultListModel;
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JList;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.SwingUtilities;
+import javax.swing.*;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -26,16 +20,16 @@ import ch.fhnw.digi.mockups.case3.JobMessage;
 @Component
 public class UI extends JFrame {
 
+	private static final Logger logger = LogManager.getLogger(UI.class);
+
 	@Autowired
 	private MessageSender messageSender;
 
 	private JList<JobMessage> m_list_jobs;
-	private DefaultListModel<JobMessage> m_list_jobs_model;
+	DefaultListModel<JobMessage> m_list_jobs_model;
+	DefaultListModel<String> m_list_assignments_model;
 
-	private JList<String> m_list_assignments;
-	private DefaultListModel<String> m_list_assignments_model;
-
-	private JButton m_btn_requestJob;
+	private JTextField m_txt_employeeName;
 
 	@PostConstruct
 	void init() {
@@ -44,36 +38,47 @@ public class UI extends JFrame {
 		m_list_jobs = new JList<JobMessage>(m_list_jobs_model);
 
 		m_list_assignments_model = new DefaultListModel<String>();
-		m_list_assignments = new JList<String>(m_list_assignments_model);
+		JList<String> m_list_assignments = new JList<String>(m_list_assignments_model);
 
-		m_btn_requestJob = new JButton("Selektierten Job anfordern");
-		m_btn_requestJob.addActionListener(new ActionListener() {
+		m_txt_employeeName = new JTextField(20);
+		JButton m_btn_assign = new JButton("An Mitarbeiter zuweisen");
+		m_btn_assign.addActionListener(new ActionListener() {
 			@Override
-			public void actionPerformed(ActionEvent arg0) {
-				acceptSelectedJob();
+			public void actionPerformed(ActionEvent e) {
+		        requestSelectedJob();
 			}
 		});
+
+		JPanel namePanel = new JPanel();
+		namePanel.add(new JLabel("Name Mitarbeiter:"));
+		namePanel.add(m_txt_employeeName);
+		namePanel.add(m_btn_assign);
 
 		JPanel rootPanel = new JPanel(new BorderLayout());
 		JPanel listsPanel = new JPanel();
 		listsPanel.setLayout(new BoxLayout(listsPanel, BoxLayout.X_AXIS));
+
 		JPanel jobsPanel = new JPanel(new BorderLayout());
-		JPanel assignmentsPanel = new JPanel(new BorderLayout());
-		
-		
-		jobsPanel.add(new JLabel("offene Jobs:"),BorderLayout.NORTH);
-		
-		
+		jobsPanel.add(new JLabel("Offene Jobs:"), BorderLayout.NORTH);
 		jobsPanel.add(new JScrollPane(m_list_jobs), BorderLayout.CENTER);
-		jobsPanel.setMinimumSize(new Dimension(200,200));
-		assignmentsPanel.add(new JLabel("zugewiesene Jobs:"),BorderLayout.NORTH);
+		jobsPanel.setMinimumSize(new Dimension(200, 200));
+
+		JPanel assignmentsPanel = new JPanel(new BorderLayout());
+		assignmentsPanel.add(new JLabel("Zugewiesene Jobs:"), BorderLayout.NORTH);
 		assignmentsPanel.add(new JScrollPane(m_list_assignments), BorderLayout.CENTER);
-		assignmentsPanel.setMinimumSize(new Dimension(200,200));
+		assignmentsPanel.setMinimumSize(new Dimension(200, 200));
+
 		listsPanel.add(jobsPanel);
 		listsPanel.add(assignmentsPanel);
-		rootPanel.add(m_btn_requestJob, BorderLayout.SOUTH);
-		rootPanel.add(listsPanel,BorderLayout.CENTER);
 
+		rootPanel.add(namePanel, BorderLayout.NORTH);
+		rootPanel.add(listsPanel, BorderLayout.CENTER);
+
+		getContentPane().add(rootPanel);
+
+		setSize(800, 600);
+		setDefaultCloseOperation(EXIT_ON_CLOSE);
+		setVisible(true);
 		
 		
 		getContentPane().add(rootPanel);
@@ -81,15 +86,26 @@ public class UI extends JFrame {
 		setSize(800, 600);
 		setDefaultCloseOperation(EXIT_ON_CLOSE);
 		setVisible(true);
+		logger.debug("------ UI initialized ------");
 	}
 
-	protected void acceptSelectedJob() {
-		JobMessage m = m_list_jobs.getSelectedValue();
-		if (m == null)
+	protected void requestSelectedJob() {
+		logger.info("------ Requesting selected job ------");
+		String employeeName = m_txt_employeeName.getText().trim();
+		if (!employeeName.isEmpty()) {
+			logger.debug("Employee name set to: " + employeeName);
+			// Optionally store or use the name for other operations
+		} else {
+			JOptionPane.showMessageDialog(this, "Please enter a valid name.", "Input Error", JOptionPane.ERROR_MESSAGE);
 			return;
-
-		messageSender.requestJobFromDispo(m);
-
+		}
+		JobMessage selectedJob = m_list_jobs.getSelectedValue();
+		if (selectedJob != null) {
+			messageSender.requestJobFromDispo(selectedJob, employeeName);
+		} else {
+			// Optionally show a message if no job is selected
+			JOptionPane.showMessageDialog(this, "No job selected. Please select a job to request.", "No Selection", JOptionPane.WARNING_MESSAGE);
+		}
 	}
 
 	public void addJobToList(JobMessage j) {
@@ -99,7 +115,6 @@ public class UI extends JFrame {
 					m_list_jobs_model.add(0, j);
 				}
 			}
-
 		});
 	}
 
@@ -121,5 +136,6 @@ public class UI extends JFrame {
 				}
 			}
 		});
+		logger.info("Job " + c.getJobnumber() + " wurde an \"" + c.getAssignedEmployee() + "\" vergeben");
 	}
 }

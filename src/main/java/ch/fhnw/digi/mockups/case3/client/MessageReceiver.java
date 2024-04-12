@@ -3,6 +3,9 @@ package ch.fhnw.digi.mockups.case3.client;
 import javax.jms.ConnectionFactory;
 
 import ch.fhnw.digi.mockups.case3.JobAssignmentMessage;
+import ch.fhnw.digi.mockups.case3.JobMessage;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.jms.DefaultJmsListenerContainerFactoryConfigurer;
 import org.springframework.context.annotation.Bean;
@@ -21,12 +24,17 @@ public class MessageReceiver {
 	@Autowired
 	private ConnectionFactory connectionFactory;
 
+	@Autowired
+	private MessageConverter jacksonJmsMessageConverter; // Autowired here
+
+	private static final Logger logger = LogManager.getLogger(MessageReceiver.class);
+
 	@Bean
 	public DefaultJmsListenerContainerFactory myFactory(DefaultJmsListenerContainerFactoryConfigurer configurer) {
 		DefaultJmsListenerContainerFactory factory = new DefaultJmsListenerContainerFactory();
 		configurer.configure(factory, connectionFactory);
 		factory.setPubSubDomain(true);
-		factory.setMessageConverter(jacksonJmsMessageConverter());
+		factory.setMessageConverter(jacksonJmsMessageConverter);
 		return factory;
 	}
 
@@ -38,9 +46,16 @@ public class MessageReceiver {
 		return converter;
 	}
 
-	// Listen for messages from "dispo.jobs.assignments" topic
 	@org.springframework.jms.annotation.JmsListener(destination = "dispo.jobs.assignments", containerFactory = "myFactory")
 	public void receiveAssignmentMessage(JobAssignmentMessage assignment) {
 		ui.assignJob(assignment);
+		logger.debug("Received assignment message: " + assignment.getJobnumber() + " -> " + assignment.getAssignedEmployee());
 	}
+
+	@org.springframework.jms.annotation.JmsListener(destination = "dispo.jobs.new", containerFactory = "myFactory")
+	public void receiveNewJobMessage(JobMessage job) {
+			ui.addJobToList(job);
+			logger.debug("Received new routine job message: " + job.getJobnumber());
+	}
+
 }
